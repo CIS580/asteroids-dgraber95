@@ -86,8 +86,8 @@ Player.prototype.update = function(time) {
       x: Math.sin(this.angle),
       y: Math.cos(this.angle)
     }
-    this.velocity.x -= acceleration.x;
-    this.velocity.y -= acceleration.y;
+    this.velocity.x -= acceleration.x * 0.25;
+    this.velocity.y -= acceleration.y * 0.25;
   }
   // Apply velocity
   this.position.x += this.velocity.x;
