@@ -29,41 +29,45 @@ function Player(position, canvas) {
   this.thrusting = false;
   this.steerLeft = false;
   this.steerRight = false;
+  this.lives = 3;
+  this.p_key = false;
+  this.paused = false;
 
-  var self = this;
-  window.onkeydown = function(event) {
-    switch(event.key) {
+}
+
+
+Player.prototype.buttonDown = function(event){
+      switch(event.key) {
       case 'ArrowUp': // up
       case 'w':
-        self.thrusting = true;
+        this.thrusting = true;
         break;
       case 'ArrowLeft': // left
       case 'a':
-        self.steerLeft = true;
+        this.steerLeft = true;
         break;
       case 'ArrowRight': // right
       case 'd':
-        self.steerRight = true;
+        this.steerRight = true;
         break;
     }
-  }
+}
 
-  window.onkeyup = function(event) {
+Player.prototype.buttonUp = function(event){
     switch(event.key) {
       case 'ArrowUp': // up
       case 'w':
-        self.thrusting = false;
+        this.thrusting = false;
         break;
       case 'ArrowLeft': // left
       case 'a':
-        self.steerLeft = false;
+        this.steerLeft = false;
         break;
       case 'ArrowRight': // right
       case 'd':
-        self.steerRight = false;
-        break;
+        this.steerRight = false;
+        break;        
     }
-  }
 }
 
 
