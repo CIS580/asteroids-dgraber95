@@ -16,7 +16,7 @@ function Asteroid(canvas, sx, sy, dir) {
   this.worldHeight = canvas.height;
   this.spritesheet = new Image();
   this.spritesheet.src = 'assets/asteroids/large.png';
-  this.diameter  = Math.random() * 50 + 70;
+  this.diameter  = Math.random() * 40 + 80;
   this.radius = this.diameter/2;
   this.mass = this.diameter / 120;
   this.color = "green";
@@ -58,7 +58,7 @@ function Asteroid(canvas, sx, sy, dir) {
   this.count = 0;
   this.frame = 1;
   this.angle = Math.random() * 2 * Math.PI;
-  this.angularVelocity = Math.random() * 0.15 - 0.075;
+  this.angularVelocity = Math.random() * 0.1 - 0.05;
 }
 
 
@@ -88,11 +88,11 @@ Asteroid.prototype.update = function(time) {
 Asteroid.prototype.render = function(time, ctx) {
 
 
-  ctx.globalAlpha = 1.0;
-  ctx.fillStyle = 'white';
-  ctx.font = "15px Lucida Console";
-  ctx.fillText("(" + Math.floor(this.position.x) + ", " + Math.floor(this.position.y) + ")", this.position.x + 20, this.position.y - 20);
-  ctx.fillText("Radius: " + Math.floor(this.radius), this.position.x + 20, this.position.y - 45);
+  // ctx.globalAlpha = 1.0;
+  // ctx.fillStyle = 'white';
+  // ctx.font = "15px Lucida Console";
+  // ctx.fillText("(" + Math.floor(this.position.x) + ", " + Math.floor(this.position.y) + ")", this.position.x + 20, this.position.y - 20);
+  // ctx.fillText("Radius: " + Math.floor(this.radius), this.position.x + 20, this.position.y - 45);
 
   ctx.save();
   ctx.translate(this.position.x, this.position.y);
@@ -106,11 +106,12 @@ Asteroid.prototype.render = function(time, ctx) {
     //destination rectangle
     -1 * this.diameter/2, -1 * (this.diameter/2), this.diameter, this.diameter
   );
-  ctx.beginPath();
-  ctx.lineWidth = "3";
-  ctx.strokeStyle = this.color;
-  ctx.rect(-1*this.diameter/2, -1*this.diameter/2, this.diameter, this.diameter);
-  ctx.stroke();
+
+  // ctx.beginPath();
+  // ctx.lineWidth = "3";
+  // ctx.strokeStyle = this.color;
+  // ctx.rect(-1*this.diameter/2, -1*this.diameter/2, this.diameter, this.diameter);
+  // ctx.stroke();
 
   ctx.restore();  
 }

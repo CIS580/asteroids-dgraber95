@@ -1,6 +1,9 @@
 "use strict";
 
 const MS_PER_FRAME = 1000/8;
+const LASER_WAIT = 200;
+
+const Laser = require('./laser.js');
 
 /**
  * @module exports the Player class
@@ -13,6 +16,7 @@ module.exports = exports = Player;
  * @param {Postition} position object specifying an x and y
  */
 function Player(position, canvas) {
+  this.canvas = canvas;
   this.worldWidth = canvas.width;
   this.worldHeight = canvas.height;
   this.state = "idle";
@@ -32,12 +36,21 @@ function Player(position, canvas) {
   this.lives = 3;
   this.p_key = false;
   this.paused = false;
-
+  this.laser_wait = 0;
+  this.ready_to_fire = false;
+  this.lasers = [];
+  this.color = "white";
 }
 
 
 Player.prototype.buttonDown = function(event){
       switch(event.key) {
+      case ' ':
+        if(this.ready_to_fire){
+          this.lasers.push(new Laser(this.position, (this.angle % (2*Math.PI) + Math.PI/2), this.canvas));
+          this.ready_to_fire = false;
+        }
+        break;
       case 'ArrowUp': // up
       case 'w':
         this.thrusting = true;
@@ -77,6 +90,12 @@ Player.prototype.buttonUp = function(event){
  * {DOMHighResTimeStamp} time the elapsed time since the last frame
  */
 Player.prototype.update = function(time) {
+  this.laser_wait += time;
+  if(this.laser_wait >= LASER_WAIT){
+    this.ready_to_fire = true;
+    this.laser_wait = 0;
+  }
+
   // Apply angular velocity
   if(this.steerLeft) {
     this.angle += time * 0.005;
@@ -101,6 +120,16 @@ Player.prototype.update = function(time) {
   if(this.position.x > this.worldWidth) this.position.x -= this.worldWidth;
   if(this.position.y < 0) this.position.y += this.worldHeight;
   if(this.position.y > this.worldHeight) this.position.y -= this.worldHeight;
+
+  // Update lasers
+  for(var i = 0; i < this.lasers.length; i++){
+    this.lasers[i].update(time);
+  }
+  if(this.lasers.length != 0 && 
+     (this.lasers[0].position.x < 0 || this.lasers[0].position.x > this.worldWidth ||
+     this.lasers[0].position.y < 0 || this.lasers[0].position.y > this.worldHeight)){
+    this.lasers.splice(0,1);
+  } 
 }
 
 /**
@@ -110,6 +139,10 @@ Player.prototype.update = function(time) {
  */
 Player.prototype.render = function(time, ctx) {
   ctx.save();
+  // Draw lasers
+  for(var i = 0; i < this.lasers.length; i++){
+    this.lasers[i].render(time, ctx);
+  }
 
   // Draw player's ship
   ctx.translate(this.position.x, this.position.y);
@@ -120,7 +153,7 @@ Player.prototype.render = function(time, ctx) {
   ctx.lineTo(0, 0);
   ctx.lineTo(10, 10);
   ctx.closePath();
-  ctx.strokeStyle = 'white';
+  ctx.strokeStyle = this.color;
   ctx.stroke();
 
   // Draw engine thrust
