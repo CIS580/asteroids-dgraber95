@@ -14,22 +14,10 @@ const Asteroid = require('./asteroid.js');
 /* Global variables */
 var canvas = document.getElementById('screen');
 var game = new Game(canvas, update, render);
+var background = new Image();
+background.src = 'assets/background.jpg';
 var player = new Player({x: canvas.width/2, y: canvas.height/2}, canvas);
 var asteroids = [];
-var axisList = [];
-
-for(var i = 0; i < INIT_ASTEROIDS; i++){
-  asteroids.push(new Asteroid(canvas, 3));
-  axisList.push(asteroids[i]);
-}
-
-// asteroids.push(new Asteroid(canvas, 150, 150, 0));
-// axisList.push(asteroids[0]);
-// asteroids.push(new Asteroid(canvas, 400, 100, 1));
-// axisList.push(asteroids[1]);
-
-axisList.sort(function(a,b){return a.position.x - b.position.x});
-
 
 var cursor_x = 0;
 var cursor_y = 0;
@@ -40,9 +28,13 @@ var state = 'ready';        // State of the game (initally ready)
 var countDown = COUNTDOWN;  // Countdown for ready screen
 var p_key = false;          // Used for pausing/unpausing
 
-
 var newgameSound = new Audio('sounds/newgame.wav');
 newgameSound.volume = 0.5;
+
+for(var i = 0; i < INIT_ASTEROIDS; i++){
+  asteroids.push(new Asteroid(level, canvas, 3));
+}
+
 
 
 /**
@@ -78,9 +70,9 @@ function getMousePos(event) {
  * p = pause/unpause
  */
 window.onkeydown = function(event) {
-  switch(event.keyCode) {
+  switch(event.key) {
     // P to pause
-    case 80:
+    case 'p':
       event.preventDefault();
       if(!p_key){
         p_key = true;
@@ -93,8 +85,13 @@ window.onkeydown = function(event) {
         }
       }
       break;
+    // q to warp
+    case 'q':
+      if(state == 'running' && !player.dead && player.state != 'exploding')
+        player.warp(asteroids);
+      break;
     default:
-      if(state == 'running'){
+      if(state == 'running' || state == 'ready'){
         player.buttonDown(event);
       }
       break;
@@ -113,7 +110,7 @@ window.onkeyup = function(event) {
       p_key = false;
       break;
     default:
-      if(state == 'running'){
+      if(state == 'running' || state == 'ready'){
         player.buttonUp(event);
       }
       break;
@@ -142,13 +139,14 @@ window.onblur = function(){
 function update(elapsedTime) {
   switch(state) {
     case 'ready': 
+      player.invincible = true;
       countDown -= elapsedTime;
       if(countDown <= 0){
         countDown = COUNTDOWN;
         state = 'running';
+        player.invincible = false;
       }
-      break;
-
+    case 'gameover':
     case 'running':
       // Update player
       player.update(elapsedTime);
@@ -162,12 +160,25 @@ function update(elapsedTime) {
 
       // Check for collisions
       check_asteroid_collisions();
-      check_player_collisions();
       check_laser_collisions();
+      if(asteroids.length == 0){
+        new_level();
+      }
+
+      if(player.state =='exploding' || check_player_collisions()){
+        if(player.lives > 0){
+          if(player.dead){
+            player.restart();
+            state = 'ready';
+          }
+        }
+        else{
+          state = 'gameover';
+        }
+      }
       break;
     
-    // Update nothing if gameover or paused
-    case 'gameover':
+    // Update nothing if paused
     case 'paused':
       break;
   }
@@ -184,7 +195,8 @@ function check_laser_collisions(){
       if(distSquared < Math.pow(asteroids[i].radius, 2) && asteroids[i].state == 'default') {
         // Laser struck asteroid
         player.lasers[j].remove = true;
-        asteroids[i].struck(asteroids, axisList);
+        asteroids[i].struck(asteroids);
+        score += 10;
         return;
       }
     }
@@ -192,16 +204,20 @@ function check_laser_collisions(){
 }
 
 function check_player_collisions(){
-  for(var i = 0; i < asteroids.length; i++){
-    var distSquared =
-      Math.pow((player.position.x + 10) - (asteroids[i].position.x + asteroids[i].radius), 2) +
-      Math.pow((player.position.y + 10) - (asteroids[i].position.y + asteroids[i].radius), 2);
+  if(!player.dead && player.state == 'default' && !player.invincible){
+    for(var i = 0; i < asteroids.length; i++){
+      var distSquared =
+        Math.pow((player.position.x + 10) - (asteroids[i].position.x + asteroids[i].radius), 2) +
+        Math.pow((player.position.y + 10) - (asteroids[i].position.y + asteroids[i].radius), 2);
 
-    if(distSquared < Math.pow(10 + asteroids[i].radius, 2)) {
-      // Player struck asteroid
-      return;
+      if(asteroids[i].state != 'exploding' && distSquared < Math.pow(10 + asteroids[i].radius, 2)) {
+        // Player struck asteroid
+        player.explode();
+        return true;
+      }
     }
   }
+  return false;
 }
 
 function check_asteroid_collisions(){
@@ -270,18 +286,11 @@ function check_asteroid_collisions(){
   * @param {CanvasRenderingContext2D} ctx the context to render to
   */
 function render(elapsedTime, ctx) {
-  ctx.fillStyle = "black";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  player.render(elapsedTime, ctx);
+  ctx.drawImage(background, 0, 0, 960, 640, 0, 0, canvas.width, canvas.height)
   for(var i = asteroids.length - 1; i >= 0; i--){
     asteroids[i].render(elapsedTime, ctx);
   }
-
-    // Show mouse position
-    // ctx.globalAlpha = 1.0;
-    // ctx.fillStyle = 'white';
-    // ctx.font = "30px impact";
-    // ctx.fillText("X: " + cursor_x + "  Y: " + cursor_y, canvas.width/2 - 50, canvas.height/2);
+  player.render(elapsedTime, ctx);
 
     if(state != 'gameover'){
     // Render score
@@ -289,8 +298,10 @@ function render(elapsedTime, ctx) {
     ctx.fillStyle = 'white';
     ctx.strokeStyle = 'black';
     ctx.font = "40px Impact";
-    ctx.fillText("Score: " + score, canvas.width - 150, canvas.height - 40);      
-    ctx.strokeText("Score: " + score, canvas.width - 150, canvas.height - 40);  
+    ctx.fillText("Score: " + score, canvas.width - 100, canvas.height - 25);      
+    ctx.strokeText("Score: " + score, canvas.width - 100, canvas.height - 25);  
+		ctx.fillText("Level: " + level, canvas.width - 100, canvas.height - 75);
+		ctx.strokeText("Level: " + level, canvas.width - 100, canvas.height - 75);
   }
 
   // Game over screen
@@ -307,7 +318,8 @@ function render(elapsedTime, ctx) {
 		ctx.strokeText("GAME OVER", canvas.width/2, canvas.height/2); 
 		ctx.font = "35px impact";
 		ctx.fillStyle = "black";
-		ctx.fillText("Final Score: " + score, canvas.width/2, canvas.height/2 + 35);
+		ctx.fillText("Final Score: " + score, canvas.width/2, canvas.height/2 + 40);
+    ctx.fillText("Levels complete: " + (level - 1), canvas.width/2, canvas.height/2 + 80);
   }
 
   // Pause screen
@@ -326,7 +338,7 @@ function render(elapsedTime, ctx) {
 
   // Ready screen (level + countdown)
   else if(state == 'ready'){
-    ctx.globalAlpha = 0.3;
+    ctx.globalAlpha = 0.2;
     ctx.fillStyle = 'white';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.globalAlpha = 1;
@@ -335,44 +347,22 @@ function render(elapsedTime, ctx) {
     ctx.strokeStyle = 'black';
 		ctx.textAlign = "center";
 		ctx.fillText(Math.ceil(countDown/(COUNTDOWN/3)),  canvas.width/2, canvas.height/2); 
-		ctx.strokeText(Math.ceil(countDown/(COUNTDOWN/3)),  canvas.width/2, canvas.height/2); 
-		ctx.font = "40px impact";
-    ctx.fillStyle = 'white';
-    ctx.strokeStyle = 'black';
-		ctx.fillText("Level: " + level, canvas.width/2, canvas.height/2 + 60);
-		ctx.strokeText("Level: " + level, canvas.width/2, canvas.height/2 + 60);
+		ctx.strokeText(Math.ceil(countDown/(COUNTDOWN/3)),  canvas.width/2, canvas.height/2);
   }  
 }
+
 
 /**
  * @function new_level
  * 
  */
 function new_level(){
-  // Play sound, set state, increment level, speed up flow, and update score
-  newgameSound.play();
+  level++;
+  score += 100;
+  player.restart();
   state = 'ready';
-  level += 1;
-  count -= 30;
-  score += 10 * pipes_used;
-  pipes_used = 0;
-
-  // Reset board
-  startPipe = new StartPipe();
-  endPipe = new EndPipe(startPipe.x_cell, startPipe.y_cell);
-  cells = new Array(BOARD_WIDTH);
-  for (var i = 0; i < BOARD_WIDTH; i++) {
-    cells[i] = new Array(BOARD_HEIGHT);
+  asteroids = [];
+  for(var i = 0; i < INIT_ASTEROIDS; i++){
+    asteroids.push(new Asteroid(level, canvas, 3));
   }
-  cells[startPipe.x_cell][startPipe.y_cell] = startPipe;
-  cells[endPipe.x_cell][endPipe.y_cell] = endPipe; 
-
-  // Get new current pipe
-  currentPipe = Math.floor(Math.random()*6);
-  updatePipeImgSource();
-
-  // Start water flow
-  water_cell = startPipe;
-  direction = startPipe.beginFlow();
-  updateNextCell()
 }

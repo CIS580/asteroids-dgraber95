@@ -11,13 +11,16 @@ module.exports = exports = Asteroid;
  * Creates a new asteroid object
  * @param {Postition} position object specifying an x and y
  */
-function Asteroid(canvas, size, startPos, startVelocity, startDi) {
+function Asteroid(level, canvas, size, startPos, startVelocity, startDi) {
+  this.level = level;
   this.worldWidth = canvas.width;
   this.worldHeight = canvas.height;
   this.spritesheet = new Image();
   this.spritesheet.src = 'assets/asteroids/large.png';
   this.explosion = new Image();
   this.explosion.src = 'assets/explosion/explosion.png';
+  this.explosionSound = new Audio('sounds/explosion.wav');
+  this.explosionSound.playbackRate = 3;
   if(startDi) this.diameter = startDi;
   else this.diameter  = Math.random() * 40 + 80;
   this.radius = this.diameter/2;
@@ -47,34 +50,16 @@ function Asteroid(canvas, size, startPos, startVelocity, startDi) {
     this.velocity = startVelocity;
   }
   else{
+    var tempX = Math.random() + 0.5*(this.level-1);
+    var tempY = Math.random() + 0.5*(this.level-1);
+    if(Math.random() > 0.5) tempX *= -1;
+    if(Math.random() > 0.5) tempY *= -1;
     this.velocity = {
-      x: Math.random() * 2 - 1,
-      y: Math.random() * 2 - 1
+      x: tempX,
+      y: tempY
     };
   }
-
-
-  // this.position = {
-  //   x: sx, y: sy
-  // };
-
-  // switch(dir){
-  //   case 0:
-  //     this.velocity = {
-  //       x: 0.5,
-  //       y: 0
-  //     };
-  //     break;
-  //   case 1:
-  //     this.velocity = {
-  //       x: -0.5,
-  //       y: 0
-  //     };
-  //     break;
-  // };
-
   this.count = 0;
-  this.frame = 1;
   this.angle = Math.random() * 2 * Math.PI;
   this.angularVelocity = Math.random() * 0.1 - 0.05;
 }
@@ -82,20 +67,18 @@ function Asteroid(canvas, size, startPos, startVelocity, startDi) {
 /**
  * @function damages or destroyes asteroid, depending on size
  * {Asteroid[]} asteroids the current list of asteroids
- * {Asteroid[]} axisList list of asteroids sorted by x position
  */
-Asteroid.prototype.struck = function(asteroids, axisList) {
+Asteroid.prototype.struck = function(asteroids) {
   this.state = 'exploding';
+  this.explosionSound.play();
   if(this.size > 1){
     var angle = Math.atan(this.velocity.y/this.velocity.x);
     var velocity1 = {x: Math.cos(angle + Math.PI/4)*1.5, y: Math.sin(angle + Math.PI/4)*1.5};
     var velocity2 = {x: Math.cos(angle - Math.PI/4)*1.5, y: Math.sin(angle - Math.PI/4)*1.5};
-    var newAst1 = new Asteroid(this.canvas, this.size - 1, this.position, velocity1, this.diameter*2/3);
-    var newAst2 = new Asteroid(this.canvas, this.size - 1, this.position, velocity2, this.diameter*2/3);
+    var newAst1 = new Asteroid(this.level, this.canvas, this.size - 1, this.position, velocity1, this.diameter*2/3);
+    var newAst2 = new Asteroid(this.level, this.canvas, this.size - 1, this.position, velocity2, this.diameter*2/3);
     asteroids.push(newAst1);
     asteroids.push(newAst2);
-    axisList.push(newAst1);
-    axisList.push(newAst2);
   }
 }
 
@@ -132,13 +115,6 @@ Asteroid.prototype.update = function(time) {
  * {CanvasRenderingContext2D} ctx the context to render into
  */
 Asteroid.prototype.render = function(time, ctx) {
-
-
-  // ctx.globalAlpha = 1.0;
-  // ctx.fillStyle = 'white';
-  // ctx.font = "15px Lucida Console";
-  // ctx.fillText("(" + Math.floor(this.position.x) + ", " + Math.floor(this.position.y) + ")", this.position.x + 20, this.position.y - 20);
-  // ctx.fillText("Radius: " + Math.floor(this.radius), this.position.x + 20, this.position.y - 45);
   if(this.state == 'default'){
     ctx.save();
     ctx.translate(this.position.x, this.position.y);
@@ -164,11 +140,4 @@ Asteroid.prototype.render = function(time, ctx) {
       this.position.x, this.position.y, this.diameter, this.diameter
     );
   }
-
-  // ctx.beginPath();
-  // ctx.lineWidth = "3";
-  // ctx.strokeStyle = this.color;
-  // ctx.rect(-1*this.diameter/2, -1*this.diameter/2, this.diameter, this.diameter);
-  // ctx.stroke();
-
 }

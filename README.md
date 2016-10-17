@@ -58,3 +58,5 @@ The bundle will automatically be re-created every time you change a source file.
 ## Credits
 Asteroids provided by phaelax under CC license http://opengameart.org/content/asteroids
 Explosions provided by Cuzco under public domain license http://opengameart.org/content/explosion
+Explosion sound provided by ljudman from http://soundbible.com/1367-Grenade.html
+background from https://pixabay.com/en/nightsky-astronomy-stars-background-16967/
