@@ -124,12 +124,10 @@ Player.prototype.update = function(time) {
   // Update lasers
   for(var i = 0; i < this.lasers.length; i++){
     this.lasers[i].update(time);
+    if(this.lasers[i].remove){
+      this.lasers.splice(i,1);
+    }
   }
-  if(this.lasers.length != 0 && 
-     (this.lasers[0].position.x < 0 || this.lasers[0].position.x > this.worldWidth ||
-     this.lasers[0].position.y < 0 || this.lasers[0].position.y > this.worldHeight)){
-    this.lasers.splice(0,1);
-  } 
 }
 
 /**

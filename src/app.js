@@ -19,7 +19,7 @@ var asteroids = [];
 var axisList = [];
 
 for(var i = 0; i < INIT_ASTEROIDS; i++){
-  asteroids.push(new Asteroid(canvas));
+  asteroids.push(new Asteroid(canvas, 3));
   axisList.push(asteroids[i]);
 }
 
@@ -156,6 +156,8 @@ function update(elapsedTime) {
       // Update asteroids
       for(var i = 0; i < asteroids.length; i++){
         asteroids[i].update(elapsedTime);
+        if(asteroids[i].remove)
+          asteroids.splice(i, 1);
       }
 
       // Check for collisions
@@ -179,8 +181,10 @@ function check_laser_collisions(){
         Math.pow((player.lasers[j].position.x) - (asteroids[i].position.x + asteroids[i].radius), 2) +
         Math.pow((player.lasers[j].position.y) - (asteroids[i].position.y + asteroids[i].radius), 2);
 
-      if(distSquared < Math.pow(asteroids[i].radius, 2)) {
-        player.lasers[j].color = "green";
+      if(distSquared < Math.pow(asteroids[i].radius, 2) && asteroids[i].state == 'default') {
+        // Laser struck asteroid
+        player.lasers[j].remove = true;
+        asteroids[i].struck(asteroids, axisList);
         return;
       }
     }
@@ -194,78 +198,69 @@ function check_player_collisions(){
       Math.pow((player.position.y + 10) - (asteroids[i].position.y + asteroids[i].radius), 2);
 
     if(distSquared < Math.pow(10 + asteroids[i].radius, 2)) {
-      player.color = "red";
+      // Player struck asteroid
       return;
     }
   }
-  player.color = "white";
 }
 
 function check_asteroid_collisions(){
-  axisList.sort(function(a,b){return a.position.x - b.position.x});
+  for(var i = 0; i < asteroids.length; i++){
+    for(var j = 0; j < asteroids.length; j++)
+    {
+      if( i != j && asteroids[i].state != 'exploding' && asteroids[j].state != 'exploding'){
+        var distSquared =
+          Math.pow((asteroids[i].position.x + asteroids[i].radius) - (asteroids[j].position.x + asteroids[j].radius), 2) +
+          Math.pow((asteroids[i].position.y + asteroids[i].radius) - (asteroids[j].position.y + asteroids[j].radius), 2);
+        if(distSquared <= Math.pow(asteroids[i].radius + asteroids[j].radius, 2)){
+          // Calculate angle of rotation for collision
+          var angle = Math.atan(Math.abs(asteroids[i].position.y - asteroids[j].position.y)/Math.abs(asteroids[i].position.x - asteroids[j].position.x));
+          if(asteroids[i].position.y <= asteroids[j].position.y )
+            angle *= -1;
 
-  var active = [];
-  var potentiallyColliding = [];
-  // Loop over every asteroid
-  axisList.forEach(function(asteroid, aindex){
-    active = active.filter(function(oasteroid){ // remove asteroids too far away from current asteroid
-      return asteroid.position.x - oasteroid.position.x < oasteroid.diameter;
-    });
-    active.forEach(function(oasteroid, bindex){
-      potentiallyColliding.push({a: oasteroid, b: asteroid});
-    });
-    active.push(asteroid);
-  });
+          // Rotate asteroid velocities for calculations
+          var aNewX = asteroids[i].velocity.x*Math.cos(angle) - asteroids[i].velocity.y*Math.sin(angle);
+          var aNewY = asteroids[i].velocity.x*Math.sin(angle) + asteroids[i].velocity.y*Math.cos(angle);
+          var bNewX = asteroids[j].velocity.x*Math.cos(angle) - asteroids[j].velocity.y*Math.sin(angle);
+          var bNewY = asteroids[j].velocity.x*Math.sin(angle) + asteroids[j].velocity.y*Math.cos(angle);
 
-  // Check for collisions between potential pairs
-  var collisions = [];
-  potentiallyColliding.forEach(function(pair){
-    var distSquared =
-      Math.pow((pair.a.position.x + pair.a.radius) - (pair.b.position.x + pair.b.radius), 2) +
-      Math.pow((pair.a.position.y + pair.a.radius) - (pair.b.position.y + pair.b.radius), 2);
+          // Calculate new velocities of the two asteroids
+          var aNewVel = aNewX*((asteroids[i].mass - asteroids[j].mass)/(asteroids[i].mass + asteroids[j].mass)) + bNewX*((2*asteroids[j].mass)/(asteroids[i].mass + asteroids[j].mass));
+          var bNewVel = bNewX*((asteroids[j].mass - asteroids[i].mass)/(asteroids[j].mass + asteroids[i].mass)) + aNewX*((2*asteroids[i].mass)/(asteroids[j].mass + asteroids[i].mass));
 
-    if(distSquared < Math.pow(pair.a.radius + pair.b.radius, 2)) {
-      // Push the colliding pair into our collisions array
-      collisions.push(pair);
-    }
+          // Return to original orientation and assign new velocities
+          asteroids[i].velocity.x = aNewVel*Math.cos(-angle) - aNewY*Math.sin(-angle);
+          asteroids[i].velocity.y = aNewVel*Math.sin(-angle) + aNewY*Math.cos(-angle);
+          asteroids[j].velocity.x = bNewVel*Math.cos(-angle) - bNewY*Math.sin(-angle);
+          asteroids[j].velocity.y = bNewVel*Math.sin(-angle) + bNewY*Math.cos(-angle);
 
+          var aNewXPos = asteroids[i].position.x*Math.cos(angle) - asteroids[i].position.y*Math.sin(angle);
+          var aNewYPos = asteroids[i].position.x*Math.sin(angle) + asteroids[i].position.y*Math.cos(angle);
+          var bNewXPos = asteroids[j].position.x*Math.cos(angle) - asteroids[j].position.y*Math.sin(angle);
+          var bNewYPos = asteroids[j].position.x*Math.sin(angle) + asteroids[j].position.y*Math.cos(angle);
 
-    // Process asteroids collisions
-    collisions.forEach(function(pair){
-      var collisionNormal = {
-        x: pair.a.position.x - pair.b.position.x,
-        y: pair.a.position.y - pair.b.position.y
+          // Update new asteroid positions to account for overlap
+          var overlap = Math.ceil(((asteroids[i].radius + asteroids[j].radius) - Math.abs(asteroids[i].position.x - asteroids[j].position.x))/8);
+          if(overlap > 0){
+            if(asteroids[i].position.x > asteroids[j].position.x){
+              aNewXPos += overlap;
+              bNewXPos -= overlap;
+            }
+            else{
+              aNewXPos -= overlap;
+              bNewXPos += overlap;
+            }
+          }
+          // Assign new asteroid positions
+          asteroids[i].position.x = aNewXPos*Math.cos(-angle) - aNewYPos*Math.sin(-angle);
+          asteroids[i].position.y = aNewXPos*Math.sin(-angle) + aNewYPos*Math.cos(-angle);
+          asteroids[j].position.x = bNewXPos*Math.cos(-angle) - bNewYPos*Math.sin(-angle);
+          asteroids[j].position.y = bNewXPos*Math.sin(-angle) + bNewYPos*Math.cos(-angle);
+        }
       }
-      // Calculate the overlap between balls
-      var overlap = pair.a.radius + pair.b.radius + 4 - Vector.magnitude(collisionNormal);
-      var collisionNormal = Vector.normalize(collisionNormal);
-
-      pair.a.position.x += collisionNormal.x * overlap / 2;
-      pair.a.position.y += collisionNormal.y * overlap / 2; 
-      pair.b.position.x -= collisionNormal.x * overlap / 2; 
-      pair.b.position.y -= collisionNormal.y * overlap / 2; 
-      
-      var angle = Math.atan2(collisionNormal.y, collisionNormal.x);
-      var a = Vector.rotate(pair.a.velocity, angle);
-      var b = Vector.rotate(pair.b.velocity, angle);
-      // Solve the collisions along the x-axis
-      var aOriginal = a.x;
-      var bOriginal = b.x;
-
-      a.x = (aOriginal * (pair.a.mass - pair.b.mass) + 2 * pair.b.mass * bOriginal)/(pair.a.mass + pair.b.mass);
-      b.x = (bOriginal * (pair.b.mass - pair.a.mass) + 2 * pair.a.mass * aOriginal)/(pair.a.mass + pair.b.mass);
-
-      // Rotate back to the original system
-      a = Vector.rotate(a, -angle);
-      b = Vector.rotate(b, -angle);
-      pair.a.velocity.x = a.x;
-      pair.a.velocity.y = a.y;
-      pair.b.velocity.x = b.x;
-      pair.b.velocity.y = b.y;
-    });
-  });
+    }
+  }
 }
-
 
 /**
   * @function render
@@ -278,7 +273,7 @@ function render(elapsedTime, ctx) {
   ctx.fillStyle = "black";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   player.render(elapsedTime, ctx);
-  for(var i = 0; i < asteroids.length; i++){
+  for(var i = asteroids.length - 1; i >= 0; i--){
     asteroids[i].render(elapsedTime, ctx);
   }
 
@@ -286,7 +281,7 @@ function render(elapsedTime, ctx) {
     // ctx.globalAlpha = 1.0;
     // ctx.fillStyle = 'white';
     // ctx.font = "30px impact";
-    // ctx.fillText("X: " + cursor_x + "  Y: " + cursor_y, canvas.width/2 - 50, canvas.height/2);      
+    // ctx.fillText("X: " + cursor_x + "  Y: " + cursor_y, canvas.width/2 - 50, canvas.height/2);
 
     if(state != 'gameover'){
     // Render score

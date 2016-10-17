@@ -25,7 +25,8 @@ function Laser(position, angle, canvas) {
     x: Math.cos(this.angle),
     y: Math.sin(this.angle)
   }
-  this.color = "red";
+  this.color = "green";
+  this.remove = false;
 }
 
 
@@ -37,6 +38,11 @@ Laser.prototype.update = function(time) {
   // Apply velocity
   this.position.x += this.velocity.x * LASER_SPEED;
   this.position.y -= this.velocity.y * LASER_SPEED;
+
+  if(this.position.x < 0 || this.position.x > this.worldWidth ||
+     this.position.y < 0 || this.position.y > this.worldHeight){
+    this.remove = true;;
+  }
 }
 
 /**
