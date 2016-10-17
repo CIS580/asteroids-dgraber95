@@ -16,7 +16,7 @@ function Asteroid(level, canvas, size, startPos, startVelocity, startDi) {
   this.worldWidth = canvas.width;
   this.worldHeight = canvas.height;
   this.spritesheet = new Image();
-  this.spritesheet.src = 'assets/asteroids/large.png';
+  this.spritesheet.src = 'assets/asteroids/asteroid.png';
   this.explosion = new Image();
   this.explosion.src = 'assets/explosion/explosion.png';
   this.explosionSound = new Audio('sounds/explosion.wav');
@@ -25,14 +25,12 @@ function Asteroid(level, canvas, size, startPos, startVelocity, startDi) {
   else this.diameter  = Math.random() * 40 + 80;
   this.radius = this.diameter/2;
   this.mass = this.diameter / 120;
-  this.size = size;
-  this.destroyed = false;
+  this.size = size;;
   this.canvas = canvas;
   this.state = 'default';
   this.explosionFrame = 0;
   this.remove = false;
-
-
+  // Assign starting position if it exists. Generate randomly otherwise
   if(startPos){
     this.position = {x: startPos.x + 5, y: startPos.y + 5};
   }
@@ -46,6 +44,7 @@ function Asteroid(level, canvas, size, startPos, startVelocity, startDi) {
             && this.position.y > canvas.height/2 - 150 && this.position.y < canvas.height/2 + 50)
   }
 
+  // Assign starting velocity if it exists. Generate randomly otherwise
   if(startVelocity){
     this.velocity = startVelocity;
   }
@@ -81,7 +80,6 @@ Asteroid.prototype.struck = function(asteroids) {
     asteroids.push(newAst2);
   }
 }
-
 
 
 /**

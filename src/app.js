@@ -3,13 +3,10 @@
 const COUNTDOWN = 2400;
 const INIT_ASTEROIDS = 10;
 
-const Vector = require('./vector');
-
 /* Classes */
 const Game = require('./game.js');
 const Player = require('./player.js');
 const Asteroid = require('./asteroid.js');
-
 
 /* Global variables */
 var canvas = document.getElementById('screen');
@@ -18,19 +15,15 @@ var background = new Image();
 background.src = 'assets/background.jpg';
 var player = new Player({x: canvas.width/2, y: canvas.height/2}, canvas);
 var asteroids = [];
-
-var cursor_x = 0;
-var cursor_y = 0;
-
 var level = 1;              // Level counter
 var score = 0;              // Score counter
 var state = 'ready';        // State of the game (initally ready)
 var countDown = COUNTDOWN;  // Countdown for ready screen
 var p_key = false;          // Used for pausing/unpausing
-
 var newgameSound = new Audio('sounds/newgame.wav');
 newgameSound.volume = 0.5;
 
+// Create asteroids
 for(var i = 0; i < INIT_ASTEROIDS; i++){
   asteroids.push(new Asteroid(level, canvas, 3));
 }
@@ -49,29 +42,13 @@ var masterLoop = function(timestamp) {
 masterLoop(performance.now());
 
 
-/** 
- * Updates cursor position whenever mouse moves
- */
-window.onmousemove = function(event) {
-  getMousePos(event);
-}
-/**
- * @function getMousePos
- * Gets mouse position relative to the top left corner of the canvas
- */
-function getMousePos(event) {
-  var rect = canvas.getBoundingClientRect();
-  cursor_x = event.clientX - rect.left;
-  cursor_y = event.clientY - rect.top;  
-}
-
 /**
  * Handles key press down events 
  * p = pause/unpause
  */
 window.onkeydown = function(event) {
   switch(event.key) {
-    // P to pause
+    // p to pause
     case 'p':
       event.preventDefault();
       if(!p_key){
@@ -87,7 +64,7 @@ window.onkeydown = function(event) {
       break;
     // q to warp
     case 'q':
-      if(state == 'running' && !player.dead && player.state != 'exploding')
+      if(state == 'running' && player.state == 'running')
         player.warp(asteroids);
       break;
     default:
@@ -103,9 +80,9 @@ window.onkeydown = function(event) {
  * Handles key up events 
  */
 window.onkeyup = function(event) {
-  switch(event.keyCode) {
-    // P
-    case 80:
+  switch(event.key) {
+    // p
+    case 'p':
       event.preventDefault();
       p_key = false;
       break;
@@ -123,7 +100,7 @@ window.onkeyup = function(event) {
  */
 window.onblur = function(){
   if(state == 'running' || state == 'ready'){
-    //state = 'paused';
+    state = 'paused';
   }
 }
 
@@ -139,13 +116,13 @@ window.onblur = function(){
 function update(elapsedTime) {
   switch(state) {
     case 'ready': 
-      player.invincible = true;
       countDown -= elapsedTime;
       if(countDown <= 0){
         countDown = COUNTDOWN;
         state = 'running';
-        player.invincible = false;
+        player.state = 'running';
       }
+    // Intentional fallthrough
     case 'gameover':
     case 'running':
       // Update player
@@ -162,15 +139,16 @@ function update(elapsedTime) {
       check_asteroid_collisions();
       check_laser_collisions();
       if(asteroids.length == 0){
+        // Create new level if all asteroids destroyed
         new_level();
       }
+      check_player_collisions();
 
-      if(player.state =='exploding' || check_player_collisions()){
+      // If player is dead, check lives count and act accordingly
+      if(player.state == 'dead'){
         if(player.lives > 0){
-          if(player.dead){
-            player.restart();
-            state = 'ready';
-          }
+          player.restart();
+          state = 'ready';
         }
         else{
           state = 'gameover';
@@ -185,6 +163,9 @@ function update(elapsedTime) {
 }
 
 
+/**
+ * Check for laser on asteroid collisions
+ */
 function check_laser_collisions(){
   for(var i = 0; i < asteroids.length; i++){
     for(var j = 0; j < player.lasers.length; j++){
@@ -203,8 +184,11 @@ function check_laser_collisions(){
   }
 }
 
+/**
+ * Check for player on asteroid collisions
+ */
 function check_player_collisions(){
-  if(!player.dead && player.state == 'default' && !player.invincible){
+  if(player.state == 'running'){
     for(var i = 0; i < asteroids.length; i++){
       var distSquared =
         Math.pow((player.position.x + 10) - (asteroids[i].position.x + asteroids[i].radius), 2) +
@@ -213,13 +197,16 @@ function check_player_collisions(){
       if(asteroids[i].state != 'exploding' && distSquared < Math.pow(10 + asteroids[i].radius, 2)) {
         // Player struck asteroid
         player.explode();
-        return true;
+        return;
       }
     }
   }
-  return false;
 }
 
+
+/**
+ * Check for and deal with asteroid on asteroid collisions
+ */
 function check_asteroid_collisions(){
   for(var i = 0; i < asteroids.length; i++){
     for(var j = 0; j < asteroids.length; j++)
@@ -228,6 +215,7 @@ function check_asteroid_collisions(){
         var distSquared =
           Math.pow((asteroids[i].position.x + asteroids[i].radius) - (asteroids[j].position.x + asteroids[j].radius), 2) +
           Math.pow((asteroids[i].position.y + asteroids[i].radius) - (asteroids[j].position.y + asteroids[j].radius), 2);
+        // Check for collision
         if(distSquared <= Math.pow(asteroids[i].radius + asteroids[j].radius, 2)){
           // Calculate angle of rotation for collision
           var angle = Math.atan(Math.abs(asteroids[i].position.y - asteroids[j].position.y)/Math.abs(asteroids[i].position.x - asteroids[j].position.x));
@@ -250,12 +238,12 @@ function check_asteroid_collisions(){
           asteroids[j].velocity.x = bNewVel*Math.cos(-angle) - bNewY*Math.sin(-angle);
           asteroids[j].velocity.y = bNewVel*Math.sin(-angle) + bNewY*Math.cos(-angle);
 
+          // Update new asteroid positions to account for overlap
           var aNewXPos = asteroids[i].position.x*Math.cos(angle) - asteroids[i].position.y*Math.sin(angle);
           var aNewYPos = asteroids[i].position.x*Math.sin(angle) + asteroids[i].position.y*Math.cos(angle);
           var bNewXPos = asteroids[j].position.x*Math.cos(angle) - asteroids[j].position.y*Math.sin(angle);
           var bNewYPos = asteroids[j].position.x*Math.sin(angle) + asteroids[j].position.y*Math.cos(angle);
 
-          // Update new asteroid positions to account for overlap
           var overlap = Math.ceil(((asteroids[i].radius + asteroids[j].radius) - Math.abs(asteroids[i].position.x - asteroids[j].position.x))/8);
           if(overlap > 0){
             if(asteroids[i].position.x > asteroids[j].position.x){
@@ -286,14 +274,17 @@ function check_asteroid_collisions(){
   * @param {CanvasRenderingContext2D} ctx the context to render to
   */
 function render(elapsedTime, ctx) {
+  // Draw background
   ctx.drawImage(background, 0, 0, 960, 640, 0, 0, canvas.width, canvas.height)
+  // Draw asteroids
   for(var i = asteroids.length - 1; i >= 0; i--){
     asteroids[i].render(elapsedTime, ctx);
   }
+  // Draw player
   player.render(elapsedTime, ctx);
 
-    if(state != 'gameover'){
-    // Render score
+  if(state != 'gameover'){
+    // Render score and level
     ctx.globalAlpha = 1.0;
     ctx.fillStyle = 'white';
     ctx.strokeStyle = 'black';
@@ -348,7 +339,7 @@ function render(elapsedTime, ctx) {
 		ctx.textAlign = "center";
 		ctx.fillText(Math.ceil(countDown/(COUNTDOWN/3)),  canvas.width/2, canvas.height/2); 
 		ctx.strokeText(Math.ceil(countDown/(COUNTDOWN/3)),  canvas.width/2, canvas.height/2);
-  }  
+  }
 }
 
 
