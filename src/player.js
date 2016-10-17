@@ -41,7 +41,7 @@ function Player(position, canvas) {
   this.explosion = new Image();
   this.explosion.src = 'assets/explosion/explosion.png';
   this.explosionFrame = 0;
-  this.state = 'running';
+  this.state = 'ready';
 }
 
 /**
@@ -51,6 +51,7 @@ function Player(position, canvas) {
 Player.prototype.buttonDown = function(event){
   switch(event.key) {
     case ' ':
+      event.preventDefault();
       if(this.state == 'running' && this.laser_wait >= LASER_WAIT){
         this.lasers.push(new Laser(this.position, (this.angle % (2*Math.PI) + Math.PI/2), this.canvas));
         this.laser_wait = 0;
@@ -214,6 +215,7 @@ Player.prototype.update = function(time) {
 
     case 'dead':
       break;
+  }
 }
 
 /**
@@ -237,7 +239,7 @@ Player.prototype.render = function(time, ctx) {
     ctx.restore();
   }
 
-  if(this.state == 'running'){
+  if(this.state == 'running' || this.state == 'ready'){
     ctx.save();
     // Draw lasers
     for(var i = 0; i < this.lasers.length; i++){
@@ -268,7 +270,7 @@ Player.prototype.render = function(time, ctx) {
     }
     ctx.restore();
   }
-  else if(this.state == 'exploding'){
+  else{
     ctx.drawImage(
       //image
       this.explosion,

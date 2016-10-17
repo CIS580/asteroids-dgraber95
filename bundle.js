@@ -4,13 +4,10 @@
 const COUNTDOWN = 2400;
 const INIT_ASTEROIDS = 10;
 
-const Vector = require('./vector');
-
 /* Classes */
 const Game = require('./game.js');
 const Player = require('./player.js');
 const Asteroid = require('./asteroid.js');
-
 
 /* Global variables */
 var canvas = document.getElementById('screen');
@@ -19,19 +16,15 @@ var background = new Image();
 background.src = 'assets/background.jpg';
 var player = new Player({x: canvas.width/2, y: canvas.height/2}, canvas);
 var asteroids = [];
-
-var cursor_x = 0;
-var cursor_y = 0;
-
 var level = 1;              // Level counter
 var score = 0;              // Score counter
 var state = 'ready';        // State of the game (initally ready)
 var countDown = COUNTDOWN;  // Countdown for ready screen
 var p_key = false;          // Used for pausing/unpausing
-
 var newgameSound = new Audio('sounds/newgame.wav');
 newgameSound.volume = 0.5;
 
+// Create asteroids
 for(var i = 0; i < INIT_ASTEROIDS; i++){
   asteroids.push(new Asteroid(level, canvas, 3));
 }
@@ -50,29 +43,13 @@ var masterLoop = function(timestamp) {
 masterLoop(performance.now());
 
 
-/** 
- * Updates cursor position whenever mouse moves
- */
-window.onmousemove = function(event) {
-  getMousePos(event);
-}
-/**
- * @function getMousePos
- * Gets mouse position relative to the top left corner of the canvas
- */
-function getMousePos(event) {
-  var rect = canvas.getBoundingClientRect();
-  cursor_x = event.clientX - rect.left;
-  cursor_y = event.clientY - rect.top;  
-}
-
 /**
  * Handles key press down events 
  * p = pause/unpause
  */
 window.onkeydown = function(event) {
   switch(event.key) {
-    // P to pause
+    // p to pause
     case 'p':
       event.preventDefault();
       if(!p_key){
@@ -88,7 +65,7 @@ window.onkeydown = function(event) {
       break;
     // q to warp
     case 'q':
-      if(state == 'running' && !player.dead && player.state != 'exploding')
+      if(state == 'running' && player.state == 'running')
         player.warp(asteroids);
       break;
     default:
@@ -104,9 +81,9 @@ window.onkeydown = function(event) {
  * Handles key up events 
  */
 window.onkeyup = function(event) {
-  switch(event.keyCode) {
-    // P
-    case 80:
+  switch(event.key) {
+    // p
+    case 'p':
       event.preventDefault();
       p_key = false;
       break;
@@ -124,7 +101,7 @@ window.onkeyup = function(event) {
  */
 window.onblur = function(){
   if(state == 'running' || state == 'ready'){
-    //state = 'paused';
+    state = 'paused';
   }
 }
 
@@ -140,13 +117,13 @@ window.onblur = function(){
 function update(elapsedTime) {
   switch(state) {
     case 'ready': 
-      player.invincible = true;
       countDown -= elapsedTime;
       if(countDown <= 0){
         countDown = COUNTDOWN;
         state = 'running';
-        player.invincible = false;
+        player.state = 'running';
       }
+    // Intentional fallthrough
     case 'gameover':
     case 'running':
       // Update player
@@ -163,15 +140,16 @@ function update(elapsedTime) {
       check_asteroid_collisions();
       check_laser_collisions();
       if(asteroids.length == 0){
+        // Create new level if all asteroids destroyed
         new_level();
       }
+      check_player_collisions();
 
-      if(player.state =='exploding' || check_player_collisions()){
+      // If player is dead, check lives count and act accordingly
+      if(player.state == 'dead'){
         if(player.lives > 0){
-          if(player.dead){
-            player.restart();
-            state = 'ready';
-          }
+          player.restart();
+          state = 'ready';
         }
         else{
           state = 'gameover';
@@ -186,6 +164,9 @@ function update(elapsedTime) {
 }
 
 
+/**
+ * Check for laser on asteroid collisions
+ */
 function check_laser_collisions(){
   for(var i = 0; i < asteroids.length; i++){
     for(var j = 0; j < player.lasers.length; j++){
@@ -204,8 +185,11 @@ function check_laser_collisions(){
   }
 }
 
+/**
+ * Check for player on asteroid collisions
+ */
 function check_player_collisions(){
-  if(!player.dead && player.state == 'default' && !player.invincible){
+  if(player.state == 'running'){
     for(var i = 0; i < asteroids.length; i++){
       var distSquared =
         Math.pow((player.position.x + 10) - (asteroids[i].position.x + asteroids[i].radius), 2) +
@@ -214,13 +198,16 @@ function check_player_collisions(){
       if(asteroids[i].state != 'exploding' && distSquared < Math.pow(10 + asteroids[i].radius, 2)) {
         // Player struck asteroid
         player.explode();
-        return true;
+        return;
       }
     }
   }
-  return false;
 }
 
+
+/**
+ * Check for and deal with asteroid on asteroid collisions
+ */
 function check_asteroid_collisions(){
   for(var i = 0; i < asteroids.length; i++){
     for(var j = 0; j < asteroids.length; j++)
@@ -229,6 +216,7 @@ function check_asteroid_collisions(){
         var distSquared =
           Math.pow((asteroids[i].position.x + asteroids[i].radius) - (asteroids[j].position.x + asteroids[j].radius), 2) +
           Math.pow((asteroids[i].position.y + asteroids[i].radius) - (asteroids[j].position.y + asteroids[j].radius), 2);
+        // Check for collision
         if(distSquared <= Math.pow(asteroids[i].radius + asteroids[j].radius, 2)){
           // Calculate angle of rotation for collision
           var angle = Math.atan(Math.abs(asteroids[i].position.y - asteroids[j].position.y)/Math.abs(asteroids[i].position.x - asteroids[j].position.x));
@@ -251,12 +239,12 @@ function check_asteroid_collisions(){
           asteroids[j].velocity.x = bNewVel*Math.cos(-angle) - bNewY*Math.sin(-angle);
           asteroids[j].velocity.y = bNewVel*Math.sin(-angle) + bNewY*Math.cos(-angle);
 
+          // Update new asteroid positions to account for overlap
           var aNewXPos = asteroids[i].position.x*Math.cos(angle) - asteroids[i].position.y*Math.sin(angle);
           var aNewYPos = asteroids[i].position.x*Math.sin(angle) + asteroids[i].position.y*Math.cos(angle);
           var bNewXPos = asteroids[j].position.x*Math.cos(angle) - asteroids[j].position.y*Math.sin(angle);
           var bNewYPos = asteroids[j].position.x*Math.sin(angle) + asteroids[j].position.y*Math.cos(angle);
 
-          // Update new asteroid positions to account for overlap
           var overlap = Math.ceil(((asteroids[i].radius + asteroids[j].radius) - Math.abs(asteroids[i].position.x - asteroids[j].position.x))/8);
           if(overlap > 0){
             if(asteroids[i].position.x > asteroids[j].position.x){
@@ -287,14 +275,17 @@ function check_asteroid_collisions(){
   * @param {CanvasRenderingContext2D} ctx the context to render to
   */
 function render(elapsedTime, ctx) {
+  // Draw background
   ctx.drawImage(background, 0, 0, 960, 640, 0, 0, canvas.width, canvas.height)
+  // Draw asteroids
   for(var i = asteroids.length - 1; i >= 0; i--){
     asteroids[i].render(elapsedTime, ctx);
   }
+  // Draw player
   player.render(elapsedTime, ctx);
 
-    if(state != 'gameover'){
-    // Render score
+  if(state != 'gameover'){
+    // Render score and level
     ctx.globalAlpha = 1.0;
     ctx.fillStyle = 'white';
     ctx.strokeStyle = 'black';
@@ -349,7 +340,7 @@ function render(elapsedTime, ctx) {
 		ctx.textAlign = "center";
 		ctx.fillText(Math.ceil(countDown/(COUNTDOWN/3)),  canvas.width/2, canvas.height/2); 
 		ctx.strokeText(Math.ceil(countDown/(COUNTDOWN/3)),  canvas.width/2, canvas.height/2);
-  }  
+  }
 }
 
 
@@ -367,7 +358,7 @@ function new_level(){
     asteroids.push(new Asteroid(level, canvas, 3));
   }
 }
-},{"./asteroid.js":2,"./game.js":3,"./player.js":5,"./vector":6}],2:[function(require,module,exports){
+},{"./asteroid.js":2,"./game.js":3,"./player.js":5}],2:[function(require,module,exports){
 "use strict";
 
 const MS_PER_FRAME = 1000/8;
@@ -386,7 +377,7 @@ function Asteroid(level, canvas, size, startPos, startVelocity, startDi) {
   this.worldWidth = canvas.width;
   this.worldHeight = canvas.height;
   this.spritesheet = new Image();
-  this.spritesheet.src = 'assets/asteroids/large.png';
+  this.spritesheet.src = 'assets/asteroids/asteroid.png';
   this.explosion = new Image();
   this.explosion.src = 'assets/explosion/explosion.png';
   this.explosionSound = new Audio('sounds/explosion.wav');
@@ -395,14 +386,12 @@ function Asteroid(level, canvas, size, startPos, startVelocity, startDi) {
   else this.diameter  = Math.random() * 40 + 80;
   this.radius = this.diameter/2;
   this.mass = this.diameter / 120;
-  this.size = size;
-  this.destroyed = false;
+  this.size = size;;
   this.canvas = canvas;
   this.state = 'default';
   this.explosionFrame = 0;
   this.remove = false;
-
-
+  // Assign starting position if it exists. Generate randomly otherwise
   if(startPos){
     this.position = {x: startPos.x + 5, y: startPos.y + 5};
   }
@@ -416,6 +405,7 @@ function Asteroid(level, canvas, size, startPos, startVelocity, startDi) {
             && this.position.y > canvas.height/2 - 150 && this.position.y < canvas.height/2 + 50)
   }
 
+  // Assign starting velocity if it exists. Generate randomly otherwise
   if(startVelocity){
     this.velocity = startVelocity;
   }
@@ -451,7 +441,6 @@ Asteroid.prototype.struck = function(asteroids) {
     asteroids.push(newAst2);
   }
 }
-
 
 
 /**
@@ -674,29 +663,27 @@ function Player(position, canvas) {
   this.steerRight = false;
   this.lives = 3;
   this.p_key = false;
-  this.paused = false;
   this.laser_wait = 0;
-  this.ready_to_fire = false;
   this.lasers = [];
   this.color = "white";
   this.explosionSound = new Audio('sounds/explosion.wav');
   this.explosion = new Image();
   this.explosion.src = 'assets/explosion/explosion.png';
   this.explosionFrame = 0;
-  this.state = 'default';
-  this.dead = false;
-  this.invincible = true;
-  this.shots = 0;
+  this.state = 'ready';
 }
 
-
+/**
+ * Button handler for player related
+ * button presses
+ */
 Player.prototype.buttonDown = function(event){
   switch(event.key) {
     case ' ':
-      if(this.ready_to_fire && this.state == 'default'){
+      event.preventDefault();
+      if(this.state == 'running' && this.laser_wait >= LASER_WAIT){
         this.lasers.push(new Laser(this.position, (this.angle % (2*Math.PI) + Math.PI/2), this.canvas));
-        this.shots++;
-        this.ready_to_fire = false;
+        this.laser_wait = 0;
       }
       break;
     case 'ArrowUp': // up
@@ -713,7 +700,6 @@ Player.prototype.buttonDown = function(event){
       break;
   }
 }
-
 Player.prototype.buttonUp = function(event){
   switch(event.key) {
     case 'ArrowUp': // up
@@ -731,8 +717,13 @@ Player.prototype.buttonUp = function(event){
   }
 }
 
-
+/**
+ * Warps player to a random location on the screen,
+ * (supposedly) guaranteeing they won't warp onto an 
+ * asteroid
+ */
 Player.prototype.warp = function(asteroids){
+  // Reset movement variables
   var valid = false;
   this.thrusting = false;
   this.steerLeft = false;
@@ -741,19 +732,26 @@ Player.prototype.warp = function(asteroids){
     x: 0,
     y: 0
   }
+  // Warp to new, random position
   this.position = newPosition(this.worldWidth, this.worldHeight);
   for(var i = 0; i < asteroids.length; i++){
     var dist = Math.sqrt(
       Math.pow((this.position.x) - (asteroids[i].position.x + asteroids[i].radius), 2) +
       Math.pow((this.position.y) - (asteroids[i].position.y + asteroids[i].radius), 2));
 
-    if(dist < asteroids[i].radius + 100 && asteroids[i].state == 'default') {
+    // If the distance between the player's new position and any 
+    // asteroid is too small, pick a new position and restart 
+    // asteroid checking loop
+    if(dist < asteroids[i].radius + 100 && asteroids[i].state == 'running') {
       this.position = newPosition(this.worldWidth, this.worldHeight);
       i = 0;
     }
   }
 }
 
+/**
+ * Calculate a new random position
+ */
 function newPosition(width, height){
     return {
     x: Math.random()*width,
@@ -780,7 +778,7 @@ Player.prototype.restart = function() {
   this.lasers = [];
   this.angle = 0;
   this.position = {x: this.worldWidth/2, y: this.worldHeight/2};
-  this.state = 'default';
+  this.state = 'ready';
   this.velocity = {
     x: 0,
     y: 0
@@ -789,8 +787,7 @@ Player.prototype.restart = function() {
   this.steerLeft = false;
   this.steerRight = false;
   this.explosionFrame = 0;
-  this.dead = false;
-  this.ready_to_fire = false;
+  this.laser_wait = 0;
 }
 
 /**
@@ -798,52 +795,55 @@ Player.prototype.restart = function() {
  * {DOMHighResTimeStamp} time the elapsed time since the last frame
  */
 Player.prototype.update = function(time) {
-  if(this.state == 'default'){
-    this.laser_wait += time;
-    if(this.laser_wait >= LASER_WAIT){
-      if(!this.invincible)
-        this.ready_to_fire = true;
-      this.laser_wait = 0;
-    }
+  switch(this.state){
+    case 'ready':
+    case 'running':
+      // Laser wait time
+      this.laser_wait += time;
 
-    // Apply angular velocity
-    if(this.steerLeft) {
-      this.angle += time * 0.005;
-    }
-    if(this.steerRight) {
-      this.angle -= 0.1;
-    }
-    // Apply acceleration
-    if(this.thrusting) {
-      var acceleration = {
-        x: Math.sin(this.angle),
-        y: Math.cos(this.angle)
+      // Apply angular velocity
+      if(this.steerLeft) {
+        this.angle += time * 0.005;
       }
-      this.velocity.x -= acceleration.x * 0.25;
-      this.velocity.y -= acceleration.y * 0.25;
-    }
-    // Apply velocity
-    this.position.x += this.velocity.x;
-    this.position.y += this.velocity.y;
-    // Wrap around the screen
-    if(this.position.x < 0) this.position.x += this.worldWidth;
-    if(this.position.x > this.worldWidth) this.position.x -= this.worldWidth;
-    if(this.position.y < 0) this.position.y += this.worldHeight;
-    if(this.position.y > this.worldHeight) this.position.y -= this.worldHeight;
+      if(this.steerRight) {
+        this.angle -= 0.1;
+      }
+      // Apply acceleration
+      if(this.thrusting) {
+        var acceleration = {
+          x: Math.sin(this.angle),
+          y: Math.cos(this.angle)
+        }
+        this.velocity.x -= acceleration.x * 0.25;
+        this.velocity.y -= acceleration.y * 0.25;
+      }
+      // Apply velocity
+      this.position.x += this.velocity.x;
+      this.position.y += this.velocity.y;
+      // Wrap around the screen
+      if(this.position.x < 0) this.position.x += this.worldWidth;
+      if(this.position.x > this.worldWidth) this.position.x -= this.worldWidth;
+      if(this.position.y < 0) this.position.y += this.worldHeight;
+      if(this.position.y > this.worldHeight) this.position.y -= this.worldHeight;
+      // Update lasers
+      for(var i = 0; i < this.lasers.length; i++){
+        this.lasers[i].update(time);
+        if(this.lasers[i].remove){
+          this.lasers.splice(i,1);
+        }
+      }
+      break;
 
-    // Update lasers
-    for(var i = 0; i < this.lasers.length; i++){
-      this.lasers[i].update(time);
-      if(this.lasers[i].remove){
-        this.lasers.splice(i,1);
+    case 'exploding':
+      // Increment explosion frame
+      this.explosionFrame++;
+      if(this.explosionFrame >= 16){
+        this.state = 'dead';
       }
-    }
-  }
-  else if(!this.dead && this.state =='exploding'){
-    this.explosionFrame += 1;
-    if(this.explosionFrame >= 16){
-      this.dead = true;
-    }
+      break;
+
+    case 'dead':
+      break;
   }
 }
 
@@ -853,6 +853,7 @@ Player.prototype.update = function(time) {
  * {CanvasRenderingContext2D} ctx the context to render into
  */
 Player.prototype.render = function(time, ctx) {
+  // Draw remaining lives
   for(var i = 0; i < this.lives; i++){
     ctx.save();
     ctx.translate(this.worldWidth - 125 + (30 * i), this.worldHeight - 135);
@@ -867,7 +868,7 @@ Player.prototype.render = function(time, ctx) {
     ctx.restore();
   }
 
-  if(this.state == 'default'){
+  if(this.state == 'running' || this.state == 'ready'){
     ctx.save();
     // Draw lasers
     for(var i = 0; i < this.lasers.length; i++){
@@ -898,7 +899,7 @@ Player.prototype.render = function(time, ctx) {
     }
     ctx.restore();
   }
-  else if(!this.dead && this.state == 'exploding'){
+  else{
     ctx.drawImage(
       //image
       this.explosion,
@@ -910,32 +911,4 @@ Player.prototype.render = function(time, ctx) {
   }
 }
 
-},{"./laser.js":4}],6:[function(require,module,exports){
-module.exports = exports = {
-    rotate: rotate,
-    dotProduct: dotProduct,
-    magnitude: magnitude,
-    normalize: normalize
-}
-
-function rotate(a, angle) {
-    return {
-        x: a.x * Math.cos(angle) - a.y * Math.sin(angle),
-        y: a.x * Math.sin(angle) + a.y * Math.cos(angle)
-    };
-}
-
-
-function dotProduct(a, b) {
-    return a.x * b.x + a.y * b.y;
-}
-
-function magnitude(a) {
-    return Math.sqrt(a.x * a.x + a.y * a.y)
-}
-
-function normalize(a){
-    var mag = magnitude(a);
-    return {x: a.x/mag, y: a.y/mag};
-}
-},{}]},{},[1]);
+},{"./laser.js":4}]},{},[1]);
