@@ -16,9 +16,6 @@ module.exports = exports = Laser;
 function Laser(position, angle, canvas) {
   this.worldWidth = canvas.width;
   this.worldHeight = canvas.height;
-  this.sound = new Audio('sounds/laser.wav');
-  this.sound.volume = 0.5;
-  this.sound.play();
   this.position = {
     x: position.x,
     y: position.y

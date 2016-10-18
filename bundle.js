@@ -218,6 +218,8 @@ function check_asteroid_collisions(){
           Math.pow((asteroids[i].position.y + asteroids[i].radius) - (asteroids[j].position.y + asteroids[j].radius), 2);
         // Check for collision
         if(distSquared <= Math.pow(asteroids[i].radius + asteroids[j].radius, 2)){
+          if(asteroids[i].collisionCounter <= 0)
+            asteroids[i].collide();
           // Calculate angle of rotation for collision
           var angle = Math.atan(Math.abs(asteroids[i].position.y - asteroids[j].position.y)/Math.abs(asteroids[i].position.x - asteroids[j].position.x));
           if(asteroids[i].position.y <= asteroids[j].position.y )
@@ -346,12 +348,12 @@ function render(elapsedTime, ctx) {
 
 /**
  * @function new_level
- * 
  */
 function new_level(){
   level++;
   score += 100;
   player.restart();
+  if(level%2) player.lives++;
   state = 'ready';
   asteroids = [];
   for(var i = 0; i < INIT_ASTEROIDS; i++){
@@ -362,11 +364,15 @@ function new_level(){
 "use strict";
 
 const MS_PER_FRAME = 1000/8;
+const COLL_MIN = 1000;
 /**
  * @module exports the Asteroid class
  */
 module.exports = exports = Asteroid;
 
+  var explosionSound = new Audio('sounds/explosion.wav');
+  explosionSound.playbackRate = 3;
+  
 /**
  * @constructor Asteroid
  * Creates a new asteroid object
@@ -380,8 +386,9 @@ function Asteroid(level, canvas, size, startPos, startVelocity, startDi) {
   this.spritesheet.src = 'assets/asteroids/asteroid.png';
   this.explosion = new Image();
   this.explosion.src = 'assets/explosion/explosion.png';
-  this.explosionSound = new Audio('sounds/explosion.wav');
-  this.explosionSound.playbackRate = 3;
+  this.collisionSound = new Audio('sounds/collision.wav');
+  this.collisionSound.playbackRate = 4;
+  this.collisionSound.volume = 0.1;
   if(startDi) this.diameter = startDi;
   else this.diameter  = Math.random() * 40 + 80;
   this.radius = this.diameter/2;
@@ -391,6 +398,7 @@ function Asteroid(level, canvas, size, startPos, startVelocity, startDi) {
   this.state = 'default';
   this.explosionFrame = 0;
   this.remove = false;
+  this.collisionCounter = COLL_MIN;
   // Assign starting position if it exists. Generate randomly otherwise
   if(startPos){
     this.position = {x: startPos.x + 5, y: startPos.y + 5};
@@ -430,7 +438,8 @@ function Asteroid(level, canvas, size, startPos, startVelocity, startDi) {
  */
 Asteroid.prototype.struck = function(asteroids) {
   this.state = 'exploding';
-  this.explosionSound.play();
+  explosionSound.currentTime = 0;
+  explosionSound.play();
   if(this.size > 1){
     var angle = Math.atan(this.velocity.y/this.velocity.x);
     var velocity1 = {x: Math.cos(angle + Math.PI/4)*1.5, y: Math.sin(angle + Math.PI/4)*1.5};
@@ -442,12 +451,21 @@ Asteroid.prototype.struck = function(asteroids) {
   }
 }
 
+/**
+ * @function called on one asteroid in a two-asteroid collision
+ */
+Asteroid.prototype.collide = function(asteroids) {
+  this.collisionSound.play();
+  this.collisionCounter = COLL_MIN;
+}
+
 
 /**
  * @function updates the asteroid object
  * {DOMHighResTimeStamp} time the elapsed time since the last frame
  */
 Asteroid.prototype.update = function(time) {
+  this.collisionCounter -= time;
   if(this.state == 'default'){
     this.angle -= this.angularVelocity;
 
@@ -578,9 +596,6 @@ module.exports = exports = Laser;
 function Laser(position, angle, canvas) {
   this.worldWidth = canvas.width;
   this.worldHeight = canvas.height;
-  this.sound = new Audio('sounds/laser.wav');
-  this.sound.volume = 0.5;
-  this.sound.play();
   this.position = {
     x: position.x,
     y: position.y
@@ -671,6 +686,8 @@ function Player(position, canvas) {
   this.explosion.src = 'assets/explosion/explosion.png';
   this.explosionFrame = 0;
   this.state = 'ready';
+  this.laserSound = new Audio('sounds/laser.wav');
+  this.laserSound.volume = 0.5;
 }
 
 /**
@@ -682,7 +699,11 @@ Player.prototype.buttonDown = function(event){
     case ' ':
       event.preventDefault();
       if(this.state == 'running' && this.laser_wait >= LASER_WAIT){
+        this.lasers.push(new Laser(this.position, (this.angle % (2*Math.PI) + Math.PI/2 + 0.1), this.canvas));
         this.lasers.push(new Laser(this.position, (this.angle % (2*Math.PI) + Math.PI/2), this.canvas));
+        this.lasers.push(new Laser(this.position, (this.angle % (2*Math.PI) + Math.PI/2 - 0.1), this.canvas));
+        this.laserSound.currentTime = 0;
+        this.laserSound.play();
         this.laser_wait = 0;
       }
       break;
@@ -856,7 +877,7 @@ Player.prototype.render = function(time, ctx) {
   // Draw remaining lives
   for(var i = 0; i < this.lives; i++){
     ctx.save();
-    ctx.translate(this.worldWidth - 125 + (30 * i), this.worldHeight - 135);
+    ctx.translate(this.worldWidth - 50 - (30 * i), this.worldHeight - 135);
     ctx.beginPath();
     ctx.moveTo(0, -10);
     ctx.lineTo(-10, 10);

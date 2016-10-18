@@ -217,6 +217,8 @@ function check_asteroid_collisions(){
           Math.pow((asteroids[i].position.y + asteroids[i].radius) - (asteroids[j].position.y + asteroids[j].radius), 2);
         // Check for collision
         if(distSquared <= Math.pow(asteroids[i].radius + asteroids[j].radius, 2)){
+          if(asteroids[i].collisionCounter <= 0)
+            asteroids[i].collide();
           // Calculate angle of rotation for collision
           var angle = Math.atan(Math.abs(asteroids[i].position.y - asteroids[j].position.y)/Math.abs(asteroids[i].position.x - asteroids[j].position.x));
           if(asteroids[i].position.y <= asteroids[j].position.y )
@@ -345,12 +347,12 @@ function render(elapsedTime, ctx) {
 
 /**
  * @function new_level
- * 
  */
 function new_level(){
   level++;
   score += 100;
   player.restart();
+  if(level%2) player.lives++;
   state = 'ready';
   asteroids = [];
   for(var i = 0; i < INIT_ASTEROIDS; i++){

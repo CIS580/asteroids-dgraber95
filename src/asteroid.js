@@ -1,11 +1,15 @@
 "use strict";
 
 const MS_PER_FRAME = 1000/8;
+const COLL_MIN = 1000;
 /**
  * @module exports the Asteroid class
  */
 module.exports = exports = Asteroid;
 
+  var explosionSound = new Audio('sounds/explosion.wav');
+  explosionSound.playbackRate = 3;
+  
 /**
  * @constructor Asteroid
  * Creates a new asteroid object
@@ -19,8 +23,9 @@ function Asteroid(level, canvas, size, startPos, startVelocity, startDi) {
   this.spritesheet.src = 'assets/asteroids/asteroid.png';
   this.explosion = new Image();
   this.explosion.src = 'assets/explosion/explosion.png';
-  this.explosionSound = new Audio('sounds/explosion.wav');
-  this.explosionSound.playbackRate = 3;
+  this.collisionSound = new Audio('sounds/collision.wav');
+  this.collisionSound.playbackRate = 4;
+  this.collisionSound.volume = 0.1;
   if(startDi) this.diameter = startDi;
   else this.diameter  = Math.random() * 40 + 80;
   this.radius = this.diameter/2;
@@ -30,6 +35,7 @@ function Asteroid(level, canvas, size, startPos, startVelocity, startDi) {
   this.state = 'default';
   this.explosionFrame = 0;
   this.remove = false;
+  this.collisionCounter = COLL_MIN;
   // Assign starting position if it exists. Generate randomly otherwise
   if(startPos){
     this.position = {x: startPos.x + 5, y: startPos.y + 5};
@@ -69,7 +75,8 @@ function Asteroid(level, canvas, size, startPos, startVelocity, startDi) {
  */
 Asteroid.prototype.struck = function(asteroids) {
   this.state = 'exploding';
-  this.explosionSound.play();
+  explosionSound.currentTime = 0;
+  explosionSound.play();
   if(this.size > 1){
     var angle = Math.atan(this.velocity.y/this.velocity.x);
     var velocity1 = {x: Math.cos(angle + Math.PI/4)*1.5, y: Math.sin(angle + Math.PI/4)*1.5};
@@ -81,12 +88,21 @@ Asteroid.prototype.struck = function(asteroids) {
   }
 }
 
+/**
+ * @function called on one asteroid in a two-asteroid collision
+ */
+Asteroid.prototype.collide = function(asteroids) {
+  this.collisionSound.play();
+  this.collisionCounter = COLL_MIN;
+}
+
 
 /**
  * @function updates the asteroid object
  * {DOMHighResTimeStamp} time the elapsed time since the last frame
  */
 Asteroid.prototype.update = function(time) {
+  this.collisionCounter -= time;
   if(this.state == 'default'){
     this.angle -= this.angularVelocity;
 

@@ -42,6 +42,8 @@ function Player(position, canvas) {
   this.explosion.src = 'assets/explosion/explosion.png';
   this.explosionFrame = 0;
   this.state = 'ready';
+  this.laserSound = new Audio('sounds/laser.wav');
+  this.laserSound.volume = 0.5;
 }
 
 /**
@@ -53,7 +55,11 @@ Player.prototype.buttonDown = function(event){
     case ' ':
       event.preventDefault();
       if(this.state == 'running' && this.laser_wait >= LASER_WAIT){
+        this.lasers.push(new Laser(this.position, (this.angle % (2*Math.PI) + Math.PI/2 + 0.1), this.canvas));
         this.lasers.push(new Laser(this.position, (this.angle % (2*Math.PI) + Math.PI/2), this.canvas));
+        this.lasers.push(new Laser(this.position, (this.angle % (2*Math.PI) + Math.PI/2 - 0.1), this.canvas));
+        this.laserSound.currentTime = 0;
+        this.laserSound.play();
         this.laser_wait = 0;
       }
       break;
@@ -227,7 +233,7 @@ Player.prototype.render = function(time, ctx) {
   // Draw remaining lives
   for(var i = 0; i < this.lives; i++){
     ctx.save();
-    ctx.translate(this.worldWidth - 125 + (30 * i), this.worldHeight - 135);
+    ctx.translate(this.worldWidth - 50 - (30 * i), this.worldHeight - 135);
     ctx.beginPath();
     ctx.moveTo(0, -10);
     ctx.lineTo(-10, 10);
